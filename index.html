@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cascadia+Code:ital,wght@0,200..700;1,200..700&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
+  <link href="https://db.onlinewebfonts.com/c/d8645efa6b6ff87ba2390a857b4ffcfc?family=Galvji" rel="stylesheet"> 
+  <link rel="stylesheet" href="css/array.css">
+  <title>Exposing Material - Architecture</title>
+  <style>
+
+  @import url('array.css'); /* If style.css and array.css are in the same css/ folder */
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: black;
+      overflow-x: hidden;
+    }
+
+    /* =========================
+       INTRO OVERLAY (IN FRONT)
+       ========================= */
+    #intro-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: #000;
+      display: flex;
+      pointer-events: auto;
+      overflow: hidden;
+    }
+
+    .intro-half {
+      position: relative;
+      width: 50vw;
+      height: 100vh;
+      background: #d8d8d8;
+      overflow: hidden;
+      display: flex;
+      transform: translateX(0);
+      transition: transform 1.1s ease-in-out;
+    }
+
+
+    /* Dense grid of circles */
+    .intro-grid {
+      display: grid;
+      grid-template-columns: repeat(135, 1fr); /* density horizontally */
+      grid-auto-rows: 1fr;
+      width: 100%;
+      height: 100%;
+    }
+
+   .intro-dot {
+  width: 7px;                /* bigger */
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid #000;   /* only black border */
+  background: none;
+  margin: auto;
+  pointer-events: auto;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+
+    .intro-dot.popped {
+      opacity: 0;
+      transform: scale(0);
+      pointer-events: none;
+    }
+
+    /* Title in the center of the screen */
+    .intro-title {
+      position: fixed;
+      top: 49%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #000;
+      text-align: left;
+      pointer-events: none;
+      z-index: 1001;
+    }
+
+    .intro-title h1 {
+      font-family: Array-Semibold, "Space Grotesk", system-ui, sans-serif;
+      font-size: 6.1rem;
+      line-height: 0.9;
+    }
+
+    /* Opening state: doors slide out from the middle */
+    #intro-overlay.open .intro-half-left {
+      transform: translateX(-100%);
+    }
+
+    #intro-overlay.open .intro-half-right {
+      transform: translateX(100%);
+    }
+
+    #intro-overlay.open .intro-title {
+      opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+
+    #intro-overlay.hidden {
+      display: none;
+    }
+
+    /* =========================
+       YOUR ORIGINAL STYLES
+       (unchanged)
+       ========================= */
+
+    /* Top navigation bar */
+    #top-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 80px;
+      display: flex;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .nav-item {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.5rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+      border-right: 1px solid rgba(255, 255, 255, 0.2);
+      opacity: 0.6;
+    }
+
+    .nav-item:last-child {
+      border-right: none;
+    }
+
+    .nav-item:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-item.active {
+      opacity: 1;
+      border-bottom: 3px solid white;
+    }
+
+    /* Code background - scrolls with page */
+    #code-background {
+      position: fixed;
+      inset: 0;
+      color: #4ade80;
+      font-family: 'Cascadia Code';
+      font-weight: 300;
+      font-size: 12px;
+      line-height: 1.8;
+      padding: 20px;
+      opacity: 0.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Main scroll container */
+    #main-container {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Each topic section */
+    .topic-section {
+      height: 800vh;
+      position: relative;
+    }
+
+    /* Sticky viewport for 3D */
+    .viewport {
+      position: sticky;
+      top: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 800px;
+      perspective-origin: center center;
+    }
+
+    /* Side peek containers */
+    .side-peeks {
+      position: fixed;
+      top: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 20px;
+    }
+
+    .peek {
+      width: 100px;
+      height: 80vh;
+      border: 2px solid white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.4;
+      transition: opacity 0.3s;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      color: white;
+      font-size: 1.5rem;
+      font-weight: bold;
+      cursor: pointer;
+      pointer-events: all;
+    }
+
+    .peek:hover {
+      opacity: 0.7;
+    }
+
+    .peek.left {
+      background: linear-gradient(to right, rgba(0,0,0,0.8), transparent);
+    }
+
+    .peek.right {
+      background: linear-gradient(to left, rgba(0,0,0,0.8), transparent);
+    }
+
+    .side-peeks {
+      display: none;
+    }
+
+    /* 3D Scene */
+    .scene {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform-style: preserve-3d;
+    }
+
+    .rectangle {
+      position: absolute;
+      width: 60vw;
+      height: 70vh;
+      /* border: 4px solid white; */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transform-style: preserve-3d;
+      pointer-events: none;
+      opacity: 0.6;
+      text-align: center;
+    }
+
+    .rectangle h2 {
+      color: white;
+      font-size: 3.5rem;
+      font-weight: 300;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+      margin-bottom: 15px;
+    }
+
+    .rectangle p {
+      color: white;
+      font-size: 1.2rem;
+      max-width: 70%;
+      text-align: center;
+      opacity: 1;
+    }
+
+    .rectangle img {
+      max-width: 90%;
+      max-height: 80%;
+      object-fit: contain;
+      /* border: 2px solid white; */
+      display: block;
+    }
+
+    .rectangle.image-rect {
+      /* background-color: #000; */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.8;
+    }
+
+    .scene .rectangle:first-child h2 {
+      font-family: Array-Semibold;
+      font-size: 7rem;
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- INTRO OVERLAY PAGE -->
+  <div id="intro-overlay">
+    <div class="intro-half intro-half-left">
+      <div class="intro-grid" id="intro-grid-left"></div>
+    </div>
+    <div class="intro-half intro-half-right">
+      <div class="intro-grid" id="intro-grid-right"></div>
+    </div>
+    <div class="intro-title">
+      <h1>Exposed<br>Matter</h1>
+    </div>
+  </div>
+
+  <!-- Top navigation -->
+  <div id="top-nav">
+    <div class="nav-item active" data-index="0">The Met Breuer</div>
+    <div class="nav-item" data-index="1">Kips Bay Plaza</div>
+    <div class="nav-item" data-index="2">Ford Foundation</div>
+  </div>
+
+  <!-- Code background -->
+  <div id="code-background"></div>
+
+  <!-- Side peek navigation -->
+  <div class="side-peeks">
+    <div class="peek left" id="peek-prev"></div>
+    <div class="peek right" id="peek-next"></div>
+  </div>
+
+  <!-- Main container -->
+  <div id="main-container"></div>
+
+  <script>
+    /* =========================
+       INTRO OVERLAY LOGIC
+       ========================= */
+    const introOverlay = document.getElementById('intro-overlay');
+    const gridLeft = document.getElementById('intro-grid-left');
+    const gridRight = document.getElementById('intro-grid-right');
+
+    function fillGrid(grid) {
+      const COLS = 200;
+      const ROWS = 150;           // dense grid
+      const TOTAL = COLS * ROWS;
+      for (let i = 0; i < TOTAL; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'intro-dot';
+        dot.addEventListener('mouseenter', () => {
+          dot.classList.add('popped');
+        });
+        grid.appendChild(dot);
+      }
+    }
+
+    fillGrid(gridLeft);
+    fillGrid(gridRight);
+
+    let introDone = false;
+
+    function closeIntro() {
+      if (introDone) return;
+      introDone = true;
+      introOverlay.classList.add('open');
+      setTimeout(() => {
+        introOverlay.classList.add('hidden');
+      }, 1200);
+    }
+
+    // First interaction closes the intro
+    window.addEventListener('wheel', closeIntro, { once: true });
+    window.addEventListener('scroll', closeIntro, { once: true });
+    window.addEventListener('click', closeIntro, { once: true });
+    window.addEventListener('touchstart', closeIntro, { once: true });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') closeIntro();
+    });
+
+    /* =========================
+       YOUR ORIGINAL JS
+       (3D scroll etc. unchanged)
+       ========================= */
+
+    // Define content for each topic
+    const topics = [
+      {
+        name: 'The Met Breuer',
+        color: '#1a1a1a',
+        rectangles: [
+          // 0 – TEXT (title)
+          { label: 'The Met Breuer', description: '', type: 'title' },
+
+          // 1 – IMAGE
+          { label: '', description: '', type: 'image', image: 'assets/breuer-texture.jpg' },
+
+          // 2 – TEXT
+          { 
+            label: 'Madison Avenue & 75th Street, New York, NY, Marcel Breuer with Hamilton P. Smith, 1960-1965',
+            description: ''
+          },
+
+          // 3 – IMAGE
+          { label: '', description: '', type: 'image', image: 'assets/breuer-building.png' },
+
+          // 4 – TEXT
+          { 
+            label: '',
+            description: 'The Breuer building, located at the corner of Madison Avenue and 75th Street, served as the Whitney’s third home; previously, the Museum had gradually migrated northward from its original location on West Eighth Street to West 54th Street. It was designed by Hungarian-born, Bauhaus-trained architect Marcel Breuer (1902–1981), who worked with Hamilton Smith, creating a strong modernist statement in a neighborhood of traditional limestone, brownstone, and brick row houses and postwar apartment buildings. Considered somber, heavy, and even brutal at the time of its completion in 1966 (“an inverted Babylonian ziggurat,” according to one critic), Breuer’s building is now recognized as daring, strong, and innovative. It has come to be regarded as one of New York City’s most notable buildings and identified with the Whitney’s approach to art. The Whitney’s programming at the Breuer building concluded on October 20, 2014. After the opening of the Museum’s current location at 99 Gansevoort Street in 2015, the Breuer Building was occupied by first the Metropolitan Museum of Art and then by the Frick Collection, before being purchased by Sotheby’s in 2024.'
+          },
+
+          // 5 – IMAGE (reusing the first image so you don’t need new assets)
+          { label: '', description: '', type: 'image', image: 'assets/648_RFsb_2404_002_Breuer-1966-Sunken-Garden.jpg' },
+
+          // 6 – TEXT
+          { 
+            label: '',
+            description: 'This brutalist masterpiece is a concrete, zigurrat-like building with a distinguishable footbridge that connects madison avenue to its main entrance and floats above a sunken courtyard. The 76,830-square-foot building itself is composed of over 1400 granite slabs that are wrapped in concrete. The façade features the rapezoidal window. '
+          },
+
+          // 7 – IMAGE (reusing the second image)
+          { label: '', description: '', type: 'image', image: 'assets/Whitney_Breur1966_AveryGSAPP-Architectural-Plans-and-Sections_Columbia-University.png' }
+        ]
+      },
+      {
+        name: 'Kips Bay Plaza',
+        color: '#2d2d2d',
+        rectangles: [
+          // 0 – TEXT (title)
+          { label: 'Kips Bay Plaza', description: '', type: 'title' },
+
+          // 1 – IMAGE
+          { label: '', description: '', type: 'image', image: 'assets/74596b1bdc558bdecf8fd1a0394acea7.jpg' },
+
+          // 2 – TEXT
+          { 
+            label: 'First and Second Ave between 30th & 33rd, New York, NY, I.M. Pei & Associates with S.J. Kessler, 1960-1965',
+            description: ''
+          },
+
+          // 3 – IMAGE
+          { label: '', description: '', type: 'image', image: 'assets/JosephMolitor.5705_E07_00.max-1600x1600.png' },
+
+          // 4 – TEXT
+          { 
+            label: '',
+            description: 'Kips Bay Towers, situated on a large three-block site in midtown Manhattan, consists of a pair of 21-story cast-in-place concrete residential towers. Designed by renowned architect I. M. Pei in the late 1950’s and originally known as Kips Bay Plaza, it is one of New York City’s first exposed concrete apartment buildings. In 2002, Walter B. Melvin Architects, LLC performed a conditions survey of all exterior surfaces. Each facade of the towers was inspected from suspended scaffolding, and a comprehensive long-term plan was developed for the buildings. Two years later, a detailed specification was prepared to address the areas requiring restoration. The repairs completed as part of this project included the restoration of spalled concrete on the columns and spandrel beams caused by rusting steel reinforcement, and the replacement of almost 1,000 precast concrete sills. When reinforcing steel was exposed, it was thoroughly cleaned, coated, and reconfigured when necessary. Tinted concrete restoration mortars were specified in six different colors, and pigmented to match the various weathered concreted surfaces ranging from buff to dark gray. Much care was taken to match the concrete color and retain original detailing at this architecturally and technologically significant building.'
+          },
+
+          // 5 – IMAGE (reuse)
+          { label: '', description: '', type: 'image', image: 'assets/3.ext.GeorgeCserna.5705_I01_00.max-1600x1600.png' },
+
+          // 6 – TEXT
+          { 
+            label: '',
+            description: 'The twin slabs are oriented to the New York street grid positioned to maximize skyline and river views.Each is defined by a cast-in-place concrete grid that provides both structure and finish, the curved intersections of the grid expressing the fluid character of the structural pour.'
+          },
+
+          // 7 – IMAGE (reuse)
+          { label: '', description: '', type: 'image', image: 'assets/3.ren.PCF.5705_R01_00.max-1600x1600.jpg' }
+        ]
+      },
+      {
+        name: 'FORD FOUNDATION',
+        color: '#404040',
+        rectangles: [
+          // 0 – TEXT (title)
+          { label: 'Ford Foundation', description: '', type: 'title' },
+
+          // 1 – IMAGE
+          { label: '', description: '', type: 'image', image: 'assets/resize_1155Cc2723-w444.jpg' },
+
+          // 2 – TEXT
+          { 
+            label: '320 East 43rd St, New York, NY, Kevin Roche, John Dinkeloo and Associates, 1963–1968',
+            description: ''
+          },
+
+          // 3 – IMAGE
+          { label: '', description: '', type: 'image', image: 'assets/tumblr_mrra1oPPX61st4c1io7_1280.jpg' },
+
+          // 4 – TEXT
+          { 
+            label: '',
+            description: 'The Ford Foundation building was commissioned by Henry Ford II in the 1960s. The architectural firm of Kevin Roche John Dinkeloo and Associates designed a soaring, inspiring space for the foundation’s headquarters: a radically transparent building of glass, granite, and Corten steel, occupying a near-perfect square that stretches the width of the block between 42nd and 43rd streets. The 12-story enclosed atrium garden, designed by Dan Kiley, was the first of its kind in the US. When it opened in 1967, the building stood as a spectacular example of midcentury design, and an innovative urban space that captured the aspirations of the foundation’s social justice mission. New York Times architecture critic Ada Louise Huxtable wrote that the Ford Foundation headquarters is “that rarity, a building aware of its world, as well as a work of art.” In 1997, New York City’s Landmarks Preservation Commission designated it an official landmark, affirming that the building has stood the test of time.'
+          },
+
+          // 5 – IMAGE (reuse)
+          { label: '', description: '', type: 'image', image: 'assets/ford-burst-1-superJumbo.png' },
+
+          // 6 – TEXT
+          { 
+            label: '',
+            description: 'Dan Kiley’s landscape plan, installed on the ground floor of the 160-foot tall atrium, is driven by the thirteen-foot grade change between the 42nd and 43rd Street building entrances. The primary staircase connecting these entrances is broken into three sections, the landings of which access tiered garden terraces at three levels. The terraces step down to the garden’s focal point. '
+          },
+
+          // 7 – IMAGE (reuse)
+          { label: '', description: '', type: 'image', image: 'assets/ManualOfSectionIMG7.jpg' }
+        ]
+      }
+    ];
+
+    // Code content
+    const codeContent = `// Exposing Material in Architecture - Structure Revealed
+
+const materials = {
+  concrete: { density: 2400, strength: 'compression', character: 'permanent' },
+  steel: { density: 7850, strength: 'tension', character: 'industrial' },
+  glass: { density: 2500, strength: 'transparency', character: 'ethereal' },
+  wood: { density: 600, strength: 'flexibility', character: 'warm' }
+};
+
+function calculateDepth(scroll, index) {
+  const base = -800;
+  const range = 1000;
+  const progress = scroll - index;
+  return base + (progress * range);
+}
+
+// 3D Transform System
+// perspective: 800px
+// translateZ(z): -800 to +200
+// opacity: 0.6
+// transformStyle: preserve-3d
+
+/* Architecture Concept: Exposing Structure
+   Modern architecture reveals structural elements
+   This code reveals the underlying logic
+   Each material has unique properties
+   Navigation through depth creates understanding */
+
+class Material {
+  constructor(name, props) {
+    this.name = name;
+    this.density = props.density;
+    this.strength = props.strength;
+  }
+  
+  expose() {
+    return { visible: true, honest: true };
+  }
+}
+
+`.repeat(8);
+
+    // Set up elements
+    const codeBackground = document.getElementById('code-background');
+    const mainContainer = document.getElementById('main-container');
+    const peekPrev = document.getElementById('peek-prev');
+    const peekNext = document.getElementById('peek-next');
+
+    codeBackground.textContent = codeContent;
+
+    // Create sections for each topic
+    topics.forEach((topic, topicIndex) => {
+      const section = document.createElement('div');
+      section.className = 'topic-section';
+      section.dataset.topic = topicIndex;
+
+      const viewport = document.createElement('div');
+      viewport.className = 'viewport';
+
+      const scene = document.createElement('div');
+      scene.className = 'scene';
+      scene.id = `scene-${topicIndex}`;
+
+      // Create rectangles
+      topic.rectangles.forEach((rect, index) => {
+        const div = document.createElement('div');
+        div.className = 'rectangle';
+        div.style.backgroundColor = "transparent";
+        div.style.zIndex = -index;
+        
+        if (rect.type === 'image') {
+          div.classList.add('image-rect');
+          const img = document.createElement('img');
+          img.src = rect.image;
+          img.alt = topic.name;
+          img.style.maxWidth = '90%';
+          img.style.maxHeight = '80%';
+          img.style.objectFit = 'contain';
+          img.style.border = '2px solid white';
+          
+          // Error handling
+          img.onerror = function() {
+            div.innerHTML = `
+              <div style="color: red; text-align: center; padding: 20px;">
+                <p style="font-size: 1.2rem;">IMAGE NOT FOUND</p>
+                <p style="font-size: 0.9rem; margin-top: 10px;">${rect.image}</p>
+                <p style="font-size: 0.8rem; margin-top: 10px; opacity: 0.7;">Make sure your folder structure is:</p>
+                <p style="font-size: 0.8rem; opacity: 0.7;">index.html<br>assets/<br>&nbsp;&nbsp;your-image.jpg</p>
+              </div>
+            `;
+          };
+          
+          img.onload = function() {
+            console.log('✓ Image loaded:', rect.image);
+          };
+          
+          div.appendChild(img);
+        } else if (rect.type === 'title') {
+          div.innerHTML = `<h2>${rect.label}</h2>`;
+        } else {
+          div.innerHTML = `
+            <h2>${rect.label}</h2>
+            <p>${rect.description}</p>
+          `;
+        }
+        
+        scene.appendChild(div);
+      });
+
+      viewport.appendChild(scene);
+      section.appendChild(viewport);
+      mainContainer.appendChild(section);
+    });
+
+    // Current topic tracking
+    let currentTopicIndex = 0;
+
+    // Top nav click handlers
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+      item.addEventListener('click', function() {
+        const index = parseInt(this.dataset.index);
+        const section = document.querySelectorAll('.topic-section')[index];
+        section.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    // Update scene based on scroll
+    function updateScenes() {
+      const sections = document.querySelectorAll('.topic-section');
+      const totalScroll = window.scrollY;
+      const windowHeight = window.innerHeight;
+
+      // Update code background scroll
+      codeBackground.style.transform = `translateY(${-totalScroll * 0.3}px)`;
+
+      sections.forEach((section, topicIndex) => {
+        const topic = topics[topicIndex];
+        const sectionTop = section.offsetTop;
+        const sectionHeight = section.offsetHeight;
+        const sectionScroll = totalScroll - sectionTop;
+        const sectionProgress = Math.max(0, Math.min(1, sectionScroll / sectionHeight));
+
+        // Determine current topic
+        if (totalScroll >= sectionTop && totalScroll < sectionTop + sectionHeight) {
+          currentTopicIndex = topicIndex;
+          
+          // Update active nav item
+          navItems.forEach((item, i) => {
+            if (i === topicIndex) {
+              item.classList.add('active');
+            } else {
+              item.classList.remove('active');
+            }
+          });
+        }
+
+        const scene = document.getElementById(`scene-${topicIndex}`);
+        const rectangles = scene.querySelectorAll('.rectangle');
+        const totalRectangles = topic.rectangles.length;
+
+        rectangles.forEach((element, index) => {
+          const rectProgress = (sectionProgress * totalRectangles) - index;
+          const z = -800 + (rectProgress * 1000);
+
+          if (rectProgress > 1.5 || rectProgress < -0.5) {
+            element.style.display = 'none';
+          } else {
+            element.style.display = 'flex';
+            element.style.transform = `translateZ(${z}px)`;
+          }
+        });
+      });
+
+      // Update peek labels (hidden but keeping for structure)
+      peekPrev.style.display = 'none';
+      peekNext.style.display = 'none';
+    }
+
+    // Peek navigation (no longer used but keeping structure)
+    peekPrev.addEventListener('click', () => {
+      if (currentTopicIndex > 0) {
+        const prevSection = document.querySelectorAll('.topic-section')[currentTopicIndex - 1];
+        prevSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+
+    peekNext.addEventListener('click', () => {
+      if (currentTopicIndex < topics.length - 1) {
+        const nextSection = document.querySelectorAll('.topic-section')[currentTopicIndex + 1];
+        nextSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+
+    window.addEventListener('scroll', updateScenes);
+    updateScenes();
+  </script>
+</body>
+</html>
